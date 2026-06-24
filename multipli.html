@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplica Jugando</title>
+    <style>
+        body {
+            background-color: #1e222b;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+        #gameCanvas {
+            background-color: #4b5563;
+            border: 4px solid #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        .instructions {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #9ca3af;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <div class="instructions">¡Haz clic o toca directamente sobre el carril con la respuesta correcta!</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Estados del juego: 'START', 'PLAYING', 'WIN'
+        let gameState = 'START'; 
+        let coins = 0;
+        let currentLevel = 1;
+        const totalLevels = 5;
+
+        // Datos de la operación matemática
+        let num1 = 0, num2 = 0, correctAnswer = 0;
+        let options = [0, 0, 0, 0];
+
+        // Configuración de carriles y jugador
+        const laneWidth = 100;
+        let playerLane = 1; 
+        let targetLane = 1;
+        let playerX = 150; 
+        let playerY = 480;
+
+        // Feedback visual temporal
+        let feedbackText = "";
+        let feedbackColor = "";
+        let feedbackTimer = 0;
+
+        // Inicializar primer juego
+        initMath();
+
+        // Bucle Principal del Juego (60 FPS)
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+        requestAnimationFrame(gameLoop);
+
+        // Lógica de actualización de posiciones y animaciones
+        function update() {
+            if (gameState === 'PLAYING') {
+                // Movimiento fluido de la moto hacia el carril seleccionado
+                let targetX = targetLane * laneWidth + 20; 
+                playerX += (targetX - playerX) * 0.2; 
+            }
+        }
+
+        // Renderizado gráfico completo en el Canvas
+        function render() {
+            // Limpiar pantalla
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dibujar Carretera y Carriles
+            ctx.fillStyle = '#4b5563';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.setLineDash([20, 20]);
+            ctx.lineWidth = 4;
+            for (let i = 1; i < 4; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * laneWidth, 0);
+                ctx.lineTo(i * laneWidth, canvas.height);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]); // Resetear líneas discontinuas
+
+            if (gameState === 'START') {
+                // PANTALLA DE INICIO
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#ffa502';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('MOTO MATH', canvas.width / 2, 200);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '18px Arial';
+                ctx.fillText('Aprende a multiplicar jugando', canvas.width / 2, 250);
+
+                // Botón jugar
+                ctx.fillStyle = '#2ed573';
+                ctx.fillRect(100, 320, 200, 50);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('¡JUGAR AHORA!', canvas.width / 2, 352);
+
+            } else if (gameState === 'PLAYING') {
+                // MARCADORES (HUD)
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(10, 10, 90, 35);
+                ctx.fillRect(280, 10, 110, 35);
+
+                ctx.fillStyle = '#ffa502';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`🪙 ${coins}`, 25, 33);
+                ctx.fillText(`Meta: ${currentLevel}/${totalLevels}`, 295, 33);
+
+                // LETRERO DE LA PREGUNTA
+                ctx.fillStyle = '#ff4757';
+                ctx.beginPath();
+                ctx.roundRect(100, 70, 200, 60, 20);
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${num1} x ${num2}`, canvas.width / 2, 112);
+
+                // COMPUERTAS CON LAS RESPUESTAS
+                for (let i = 0; i < 4; i++) {
+                    ctx.fillStyle = '#1e90ff';
+                    ctx.beginPath();
+                    ctx.roundRect(i * laneWidth + 10, 180, 80, 50, 10);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText(options[i], i * laneWidth + 50, 214);
+                }
+
+                // JUGADOR (MOTO SIMPLIFICADA)
+                ctx.fillStyle = '#ffa502'; // Cuerpo de la moto
+                ctx.fillRect(playerX, playerY, 60, 80);
+                ctx.fillStyle = '#2f3542'; // Casco del piloto
+                ctx.beginPath();
+                ctx.arc(playerX + 30, playerY + 25, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Mostrar mensajes de acierto/error en pantalla
+                if (feedbackTimer > 0) {
+                    ctx.fillStyle = feedbackColor;
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText(feedbackText, canvas.width / 2, 280);
+                    feedbackTimer--;
+                }
+
+            } else if (gameState === 'WIN') {
+                // PANTALLA DE VICTORIA
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#ffa502';
+                ctx.font = '70px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🏆', canvas.width / 2, 200);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 30px Arial';
+                ctx.fillText('¡FELICIDADES!', canvas.width / 2, 260);
+                ctx.font = '20px Arial';
+                ctx.fillText(`Ganaste un total de: 🪙 ${coins}`, canvas.width / 2, 310);
+
+                // Botón Reiniciar
+                ctx.fillStyle = '#2ed573';
+                ctx.fillRect(100, 380, 200, 50);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText('Volver a Jugar', canvas.width / 2, 412);
+            }
+        }
+
+        // Generador de Operación Matemática
+        function initMath() {
+            num1 = Math.floor(Math.random() * 3) + 2; // Tablas 2, 3 o 4
+            num2 = Math.floor(Math.random() * 9) + 1; // Del 1 al 9
+            correctAnswer = num1 * num2;
+
+            let answersSet = new Set([correctAnswer]);
+            while(answersSet.size < 4) {
+                let wrong = correctAnswer + (Math.floor(Math.random() * 7) - 3);
+                if (wrong > 0 && wrong !== correctAnswer) {
+                    answersSet.add(wrong);
+                }
+            }
+            options = Array.from(answersSet).sort(() => 0.5 - Math.random());
+        }
+
+        // Capturar clics y toques táctiles perfectamente calculados
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (gameState === 'START') {
+                // Clic en botón Iniciar
+                if (mouseX >= 100 && mouseX <= 300 && mouseY >= 320 && mouseY <= 370) {
+                    coins = 0;
+                    currentLevel = 1;
+                    gameState = 'PLAYING';
+                    initMath();
+                }
+            } else if (gameState === 'PLAYING') {
+                // Identificar qué carril presionó el niño
+                let clickedLane = Math.floor(mouseX / laneWidth);
+                if (clickedLane >= 0 && clickedLane <= 3) {
+                    targetLane = clickedLane;
+                    
+                    // Verificar respuesta
+                    if (options[clickedLane] === correctAnswer) {
+                        coins += 20;
+                        feedbackText = "¡Excelente! +20 🪙";
+                        feedbackColor = "#2ed573";
+                    } else {
+                        feedbackText = `¡Casi! La respuesta era ${correctAnswer}`;
+                        feedbackColor = "#ff4757";
+                    }
+                    feedbackTimer = 40; // Mostrar texto por unos frames
+
+                    // Avanzar de nivel o ganar
+                    setTimeout(() => {
+                        if (currentLevel < totalLevels) {
+                            currentLevel++;
+                            initMath();
+                        } else {
+                            gameState = 'WIN';
+                        }
+                    }, 600);
+                }
+            } else if (gameState === 'WIN') {
+                // Clic en botón Reiniciar
+                if (mouseX >= 100 && mouseX <= 300 && mouseY >= 380 && mouseY <= 430) {
+                    gameState = 'START';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
